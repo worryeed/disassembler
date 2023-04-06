@@ -10,6 +10,7 @@ uses
 type
   reg8T = (AL = 192, CL, DL, BL, AH, CH, DH, BH);
   reg16T = (AX = 0, CX, DX, BX, SP, BP, SI, DI);
+  Segments = (DS= 0, ES, FS, GS, SS, CS, IP);
 
   { TForm1 }
 
@@ -125,14 +126,18 @@ end;
 
 function GetModRM(str: string): integer;
 var
-  bytetempstr, strtemp: string;
+  bytetempstr, tempstr, resstr: string;
+  i: integer;
 
 begin
   bytetempstr := '00000000';
-  strtemp := DecToBin(HexToDec(str));
-  bytetempstr[6] := strtemp[3];
-  bytetempstr[7] := strtemp[4];
-  bytetempstr[8] := strtemp[5];
+  tempstr := DecToBin(HexToDec(str));
+  for i := 1 to 8 - length(tempstr) do
+    resstr += '0';
+  resstr += tempstr;
+  bytetempstr[6] := resstr[3];
+  bytetempstr[7] := resstr[4];
+  bytetempstr[8] := resstr[5];
   GetModRM := BinToDec(bytetempstr);
 end;
 
@@ -224,6 +229,7 @@ begin
         bytestr2[2] := str[i + 1];
         i += 2;
         ModRM := GetModRM(bytestr2);
+        i += 0;
         case bytestr1 of
           'FE': begin
             case ModRM of
@@ -244,6 +250,7 @@ begin
               end;
               1: begin
                 operation := 'dec';
+
               end;
               6: begin
                 operation := 'push';
@@ -303,11 +310,12 @@ var
 
 begin
   assignfile(f, PATH);
-  resread := readfile(f);
+  //resread := readfile(f);
+  resread := 'B800702EA300002EFF0E0000B802008ED8B409BA0000CD21B8004CCD210048656C6C6F2C20576F726C642124';
   hex := GetFormateLines(resread);
   assemblerCode := GetAssemblerCode(resread);
-  //MemoByteCode.Text := resread;
   MemoByteCode.Text := hex;
+  //MemoByteCode.Text := resread;
   MemoAssembler.Text := assemblerCode;
 end;
 
