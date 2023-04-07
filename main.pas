@@ -8,7 +8,7 @@ uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, StdCtrls, ExtCtrls, Math, TypInfo;
 
 type
-  reg8T = (AL = 192, CL, DL, BL, AH, CH, DH, BH);
+  reg8T = (AL = 0, CL, DL, BL, AH, CH, DH, BH);
   reg16T = (AX = 0, CX, DX, BX, SP, BP, SI, DI);
   Segments = (DS= 0, ES, FS, GS, SS, CS, IP);
 
@@ -28,7 +28,7 @@ type
   end;
 
 const
-  PATH = 'C:\Users\SASHA\Desktop\HELLO.EXE';
+  PATH = 'C:\Users\KISTO\Desktop\HELLO.EXE';
 
 var
   f: file;
@@ -124,7 +124,7 @@ begin
   str3 := '';
 end;
 
-function GetModRM(str: string): integer;
+function GetMod(str: string): integer;
 var
   bytetempstr, tempstr, resstr: string;
   i: integer;
@@ -132,13 +132,95 @@ var
 begin
   bytetempstr := '00000000';
   tempstr := DecToBin(HexToDec(str));
-  for i := 1 to 8 - length(tempstr) do
-    resstr += '0';
+  for i := 1 to 8 - length(tempstr) do resstr += '0';
+  resstr += tempstr;
+  bytetempstr[7] := resstr[1];
+  bytetempstr[8] := resstr[2];
+  GetMod := BinToDec(bytetempstr);
+end;
+
+function GetReg(str: string): integer;
+var
+  bytetempstr, tempstr, resstr: string;
+  i: integer;
+
+begin
+  bytetempstr := '00000000';
+  tempstr := DecToBin(HexToDec(str));
+  for i := 1 to 8 - length(tempstr) do resstr += '0';
   resstr += tempstr;
   bytetempstr[6] := resstr[3];
   bytetempstr[7] := resstr[4];
   bytetempstr[8] := resstr[5];
-  GetModRM := BinToDec(bytetempstr);
+  GetReg := BinToDec(bytetempstr);
+end;
+
+function GetRM(str: string): integer;
+var
+  bytetempstr, tempstr, resstr: string;
+  i: integer;
+
+begin
+  bytetempstr := '00000000';
+  tempstr := DecToBin(HexToDec(str));
+  for i := 1 to 8 - length(tempstr) do resstr += '0';
+  resstr += tempstr;
+  bytetempstr[6] := resstr[6];
+  bytetempstr[7] := resstr[7];
+  bytetempstr[8] := resstr[8];
+  GetRM := BinToDec(bytetempstr);
+end;
+
+function GetModRM(str: string): string;
+var
+  bytetempstr, tempstr, resstr: string;
+  i: integer;
+
+begin
+  bytetempstr := '00000000';
+  tempstr := DecToBin(HexToDec(str));
+  for i := 1 to 8 - length(tempstr) do resstr += '0';
+  resstr += tempstr;
+  bytetempstr := resstr;
+  bytetempstr[3] := '0';
+  bytetempstr[4] := '0';
+  bytetempstr[5] := '0';
+  i := BinToDec(bytetempstr);
+  case dectohex(i, 1) of
+    '0':  resstr := 'DS: [BX + SI]';
+    '1':  resstr := 'DS: [BX + DI]';
+    '2':  resstr := 'SS: [BP + SI]';
+    '3':  resstr := 'SS: [BP + DI]';
+    '4':  resstr := 'DS: [SI]';
+    '5':  resstr := 'DS: [DI]';
+    '6':  resstr := 'DS: disp16';
+    '7':  resstr := 'DS: [BX]';
+    '40': resstr := 'DS: [BX + SI] + disp8';
+    '41': resstr := 'DS: [BX + DI] + disp8';
+    '42': resstr := 'SS: [BP + SI] + disp8';
+    '43': resstr := 'SS: [BP + DI] + disp8';
+    '44': resstr := 'DS: [SI] + disp8';
+    '45': resstr := 'DS: [DI] + disp8';
+    '46': resstr := 'SS: [BP] + disp8';
+    '47': resstr := 'DS: [BX] + disp8';
+    '80': resstr := 'DS: [BX + SI] + disp16';
+    '81': resstr := 'DS: [BX + DI] + disp16';
+    '82': resstr := 'SS: [BP + SI] + disp16';
+    '83': resstr := 'SS: [BP + DI] + disp16';
+    '84': resstr := 'DS: [SI] + disp16';
+    '85': resstr := 'DS: [DI] + disp16';
+    '86': resstr := 'SS: [BP] + disp16';
+    '87': resstr := 'DS: [BX] + disp16';
+    'C0': resstr := 'AX';
+    'C1': resstr := 'CX';
+    'C2': resstr := 'DX';
+    'C3': resstr := 'BX';
+    'C4': resstr := 'SP';
+    'C5': resstr := 'BP';
+    'C6': resstr := 'SI';
+    'C7': resstr := 'DI';
+  end;
+  GetModRM := resstr;
 end;
 
 function GetStrReg8(e: reg8T): string;
@@ -169,6 +251,14 @@ begin
   end;
 end;
 
+function Contains(str, str2: string): boolean;
+var
+  p: integer;
+begin
+  p := Pos(str, str2);
+  if p > 0 then contains := true
+  else contains := false;
+end;
 
 {$R *.lfm}
 
@@ -183,7 +273,7 @@ var
 begin
   numberLine := 0;
   resstr := '';
-  for i := 1 to Length(str) div 32 do
+  for i := 1 to Length(str) div 32 + 1 do
   begin
     resstr += DecToHex(numberLine, 4);
     resstr += #9;
@@ -201,8 +291,8 @@ end;
 
 function TForm1.GetAssemblerCode(str: string): string;
 var
-  resstr, bytestr1, bytestr2, operation, operand1, operand2, bytetempstr: string;
-  numberLine, i, j, ModRM, byte2int: integer;
+  resstr, bytestr1, bytestr2, bytestr3, bytestr4, operation, operand1, operand2, bytetempstr: string;
+  numberLine, i, j, modd, reg, rm, byte2int: integer;
   run: boolean;
   byteReg8: reg8T;
   byteReg16: reg16T;
@@ -217,6 +307,8 @@ begin
   resstr := '';
   setlength(bytestr1, 2);
   setlength(bytestr2, 2);
+  setlength(bytestr3, 2);
+  setlength(bytestr4, 2);
 
   while (i <= length(str)) and (run) do
   begin
@@ -224,32 +316,51 @@ begin
     bytestr1[2] := str[i + 1];
     i += 2;
     case bytestr1 of
+
       'FE'..'FF': begin
         bytestr2[1] := str[i];
         bytestr2[2] := str[i + 1];
+        reg := GetReg(bytestr2);
         i += 2;
-        ModRM := GetModRM(bytestr2);
-        i += 0;
         case bytestr1 of
           'FE': begin
-            case ModRM of
+            case reg of
               0: begin
                 operation := 'inc';
               end;
-              1: begin
+              1: begin  //reg8 или адрес 1 байт
                 operation := 'dec';
-                byteReg8 := reg8T(hextodec(bytestr2)-(8*ModRM));
+                byteReg8 := reg8T(getrm(bytestr2));
                 operand1 := GetStrReg8(byteReg8);
+                i += 2; // 1 байт
               end;
             end;
           end;
           'FF': begin
-            case ModRM of
+            case reg of
               0: begin
                 operation := 'inc';
-              end;
-              1: begin
+              end;                     //                               1   2   3  4    5   6  7
+              1: begin  //reg16 или адрес 2 байта    reg16T = (AX = 0, CX, DX, BX, SP, BP, SI, DI);
                 operation := 'dec';
+                operand1 :=  GetModRM(bytestr2);
+                if (Contains('disp16', operand1)) then
+                begin
+                  bytestr3[1] := str[i];
+                  bytestr3[2] := str[i + 1];
+                  bytestr4[1] := str[i + 2];
+                  bytestr4[2] := str[i + 3];
+                  operand1 := 'word ptr [' + inttostr(hextodec(bytestr3+bytestr4)) + ']';
+                  i += 4; // байта
+                end
+                else if (Contains('disp8', operand1)) then
+                begin
+                  i += 2; // байта
+                end
+                else
+                begin
+
+                end;
 
               end;
               6: begin
@@ -262,9 +373,10 @@ begin
         clearstr(operation, operand1, operand2);
         numberLine += 2;
       end;
+
       '48'..'4F': begin
         operation := 'dec';
-        byteReg16 := reg16T(HexToDec(bytestr1)-HexToDec('48'));
+        byteReg16 := reg16T(getrm(bytestr1));
         operand1 := GetStrReg16(byteReg16);
         resstr += DecToHex(numberLine, 4) + #9 + operation + ' ' + operand1 + ' ' + operand2 + #9 + bytestr1 + #10;
         clearstr(operation, operand1, operand2);
@@ -277,23 +389,20 @@ begin
       end;
 
 
-    end;
+    end; // case
 
 
-  end;
-
+  end;   // while
   GetAssemblerCode := resstr;
 end;
 
 function TForm1.ReadFile(var f: file): string;
 var
   str: string;
-  count: integer;
   b: byte;
 
 begin
   str := '';
-  count := 1;
   reset(f, 1);
   while (not eof(f)) do
   begin
@@ -311,11 +420,13 @@ var
 begin
   assignfile(f, PATH);
   //resread := readfile(f);
-  resread := 'B800702EA300002EFF0E0000B802008ED8B409BA0000CD21B8004CCD210048656C6C6F2C20576F726C642124';
-  hex := GetFormateLines(resread);
+  //resread := 'B800702EA300002EFF0E0000B802008ED8B409BA0000CD21B8004CCD210048656C6C6F2C20576F726C642124';
+  //resread := 'B800702EA300002EFF0E0000FECCB802008ED8B409BA0200CD21B8004CCD210048656C6C6F2C20576F726C642124';
+  resread := 'B800702EA300002EFF0E0000FECCFF0DB802008ED8B409BA0400CD21B8004CCD210048656C6C6F2C20576F726C642124';
+  //hex := GetFormateLines(resread);
   assemblerCode := GetAssemblerCode(resread);
-  MemoByteCode.Text := hex;
-  //MemoByteCode.Text := resread;
+  //MemoByteCode.Text := hex;
+  MemoByteCode.Text := resread;
   MemoAssembler.Text := assemblerCode;
 end;
 
