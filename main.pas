@@ -9,8 +9,8 @@ uses
 
 type
   reg8T = (AL = 0, CL, DL, BL, AH, CH, DH, BH);
-  reg16T = (AX = 0, CX, DX, BX, SP, BP, SI, DI);
-  Segments = (DS= 0, ES, FS, GS, SS, CS, IP);
+  reg16T =(AX = 0, CX, DX, BX, SP, BP, SI, DI);
+  sRegT = (ES = 0, CS, SS, DS);
 
   { TForm1 }
 
@@ -28,7 +28,7 @@ type
   end;
 
 const
-  PATH = 'C:\Users\KISTO\Desktop\HELLO.EXE';
+  PATH = 'C:\Users\SASHA\Desktop\HELLO.EXE';
 
 var
   f: file;
@@ -117,11 +117,17 @@ begin
   BinToDec := n;
 end;
 
-procedure clearstr(var str1, str2, str3: string);
+procedure ClearStr(var operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2: string);
 begin
-  str1 := '';
-  str2 := '';
-  str3 := '';
+  operation := '';
+  operand1 := '';
+  operand2 := '';
+  setlength(bytestr1, 2);
+  setlength(bytestr2, 2);
+  setlength(bytestr3, 2);
+  setlength(bytestr4, 2);
+  prefix1 := '';
+  prefix2 := '';
 end;
 
 function GetMod(str: string): integer;
@@ -187,38 +193,38 @@ begin
   bytetempstr[5] := '0';
   i := BinToDec(bytetempstr);
   case dectohex(i, 1) of
-    '0':  resstr := 'DS: [BX + SI]';
-    '1':  resstr := 'DS: [BX + DI]';
-    '2':  resstr := 'SS: [BP + SI]';
-    '3':  resstr := 'SS: [BP + DI]';
-    '4':  resstr := 'DS: [SI]';
-    '5':  resstr := 'DS: [DI]';
-    '6':  resstr := 'DS: disp16';
-    '7':  resstr := 'DS: [BX]';
-    '40': resstr := 'DS: [BX + SI] + disp8';
-    '41': resstr := 'DS: [BX + DI] + disp8';
-    '42': resstr := 'SS: [BP + SI] + disp8';
-    '43': resstr := 'SS: [BP + DI] + disp8';
-    '44': resstr := 'DS: [SI] + disp8';
-    '45': resstr := 'DS: [DI] + disp8';
-    '46': resstr := 'SS: [BP] + disp8';
-    '47': resstr := 'DS: [BX] + disp8';
-    '80': resstr := 'DS: [BX + SI] + disp16';
-    '81': resstr := 'DS: [BX + DI] + disp16';
-    '82': resstr := 'SS: [BP + SI] + disp16';
-    '83': resstr := 'SS: [BP + DI] + disp16';
-    '84': resstr := 'DS: [SI] + disp16';
-    '85': resstr := 'DS: [DI] + disp16';
-    '86': resstr := 'SS: [BP] + disp16';
-    '87': resstr := 'DS: [BX] + disp16';
-    'C0': resstr := 'AX';
-    'C1': resstr := 'CX';
-    'C2': resstr := 'DX';
-    'C3': resstr := 'BX';
-    'C4': resstr := 'SP';
-    'C5': resstr := 'BP';
-    'C6': resstr := 'SI';
-    'C7': resstr := 'DI';
+    '0':  resstr := '[BX + SI]';
+    '1':  resstr := '[BX + DI]';
+    '2':  resstr := '[BP + SI]';
+    '3':  resstr := '[BP + DI]';
+    '4':  resstr := '[SI]';
+    '5':  resstr := '[DI]';
+    '6':  resstr := 'disp16';
+    '7':  resstr := '[BX]';
+    '40': resstr := '[BX + SI] + disp8';
+    '41': resstr := '[BX + DI] + disp8';
+    '42': resstr := '[BP + SI] + disp8';
+    '43': resstr := '[BP + DI] + disp8';
+    '44': resstr := '[SI] + disp8';
+    '45': resstr := '[DI] + disp8';
+    '46': resstr := '[BP] + disp8';
+    '47': resstr := '[BX] + disp8';
+    '80': resstr := '[BX + SI] + disp16';
+    '81': resstr := '[BX + DI] + disp16';
+    '82': resstr := '[BP + SI] + disp16';
+    '83': resstr := '[BP + DI] + disp16';
+    '84': resstr := '[SI] + disp16';
+    '85': resstr := '[DI] + disp16';
+    '86': resstr := '[BP] + disp16';
+    '87': resstr := '[BX] + disp16';
+    //'C0': resstr := 'AX';
+    //'C1': resstr := 'CX';
+    //'C2': resstr := 'DX';
+    //'C3': resstr := 'BX';
+    //'C4': resstr := 'SP';
+    //'C5': resstr := 'BP';
+    //'C6': resstr := 'SI';
+    //'C7': resstr := 'DI';
   end;
   GetModRM := resstr;
 end;
@@ -251,13 +257,149 @@ begin
   end;
 end;
 
-function Contains(str, str2: string): boolean;
-var
-  p: integer;
+function GetStrSReg(e: sRegT): string;
 begin
-  p := Pos(str, str2);
-  if p > 0 then contains := true
+  case e of
+    ES: GetStrSReg := 'ES';
+    CS: GetStrSReg := 'CS';
+    SS: GetStrSReg := 'SS';
+    DS: GetStrSReg := 'DS';
+  end;
+end;
+
+function Contains(str, str2: string; var position: integer): boolean;
+begin
+  position := Pos(str, str2);
+  if position > 0 then contains := true
   else contains := false;
+end;
+
+function Insert(str, str2: string; pos: integer): string;
+var
+  i: integer;
+  resstr: string;
+begin
+  resstr := str;
+  if (pos > 0) then
+  begin
+    resstr := '';
+    for i := 1 to pos - 1 do resstr += str[i];
+    resstr += str2;
+    for i := pos to length(str) do resstr += str[i];
+  end;
+  Insert := resstr;
+end;
+
+procedure ReadByte(str: string; var i: integer; var str2: string);
+begin
+  str2[1] := str[i];
+  str2[2] := str[i + 1];
+  i += 2;
+  i += 0;
+end;
+
+function GetOutputStr(numberLine: integer; operation, operand1, operand2, bytestr1, prefix1, prefix2: string): string;
+var
+  temp: string;
+  position: integer;
+begin
+  temp := DecToHex(numberLine, 4) + #9 + prefix1 + ' ' + operation + #9 + operand1 + ' ' + operand2 + #9 + bytestr1 + #10;
+  if (prefix2 <> '') then
+  begin
+    position := pos('[', temp);
+    temp := Insert(temp, prefix2+':', position);
+  end;
+  GetOutputStr := temp;
+end;
+
+function GetWordPtrDisp16Str(pos: integer; operand, bytestr1, bytestr2: string): string;
+begin
+  operand := copy(operand, 1, pos-1);
+  operand := 'word ptr ' + operand + '[0x'+inttostr(strtoint(bytestr2+bytestr1))+']';
+  GetWordPtrDisp16Str := operand;
+end;
+
+function GetBytePtrDisp8Str(pos: integer; operand, bytestr1, bytestr2: string): string;
+begin
+  operand := copy(operand, 1, pos-1);
+  operand := 'byte ptr ' + operand + '[0x'+inttostr(strtoint(bytestr2+bytestr1))+']';
+  GetBytePtrDisp8Str := operand;
+end;
+
+function GetROrMem8(str, bytestr: string; var i: integer): string;
+var
+  bytestr3, bytestr4, operand: string;
+  byteReg8: reg8T;
+  pos: integer;
+
+begin
+  operand := GetModRM(bytestr);
+  if (length(operand) = 8) then
+  begin
+    byteReg8 := reg8T(getrm(bytestr));
+    operand := GetStrReg8(byteReg8);
+  end
+  else
+  begin
+    if (Contains('disp16', operand, pos)) then
+    begin
+      setlength(bytestr3, 2);
+      setlength(bytestr4, 2);
+      ReadByte(str, i, bytestr3);
+      ReadByte(str, i, bytestr4);
+      operand := GetBytePtrDisp8Str(pos, operand, bytestr3, bytestr4);
+    end
+    else if (Contains('disp8', operand, pos)) then
+    begin
+      setlength(bytestr3, 2);
+      bytestr4 := '00';
+      ReadByte(str, i, bytestr3);
+      operand := GetBytePtrDisp8Str(pos, operand, bytestr3, bytestr4);
+    end
+    else
+    begin
+      operand := 'byte ptr ' + operand;
+    end;
+  end;
+  GetROrMem8 := operand;
+end;
+
+function GetROrMem16(str, bytestr: string; var i: integer): string;
+var
+  bytestr3, bytestr4, operand: string;
+  byteReg16: reg16T;
+  pos: integer;
+
+begin
+  operand := GetModRM(bytestr);
+  if (length(operand) = 8) then
+  begin
+    byteReg16 := reg16T(getrm(bytestr));
+    operand := GetStrReg16(byteReg16);
+  end
+  else
+  begin
+    if (Contains('disp16', operand, pos)) then
+    begin
+      setlength(bytestr3, 2);
+      setlength(bytestr4, 2);
+      ReadByte(str, i, bytestr3);
+      ReadByte(str, i, bytestr4);
+      operand := GetWordPtrDisp16Str(pos, operand, bytestr3, bytestr4);
+    end
+    else if (Contains('disp8', operand, pos)) then
+    begin
+      setlength(bytestr3, 2);
+      bytestr4 := '00';
+      ReadByte(str, i, bytestr3);
+      operand := GetWordPtrDisp16Str(pos, operand, bytestr3, bytestr4);
+    end
+    else
+    begin
+      operand := 'word ptr ' + operand;
+    end;
+  end;
+  GetROrMem16 := operand;
 end;
 
 {$R *.lfm}
@@ -291,11 +433,12 @@ end;
 
 function TForm1.GetAssemblerCode(str: string): string;
 var
-  resstr, bytestr1, bytestr2, bytestr3, bytestr4, operation, operand1, operand2, bytetempstr: string;
-  numberLine, i, j, modd, reg, rm, byte2int: integer;
+  resstr, bytestr1, bytestr2, bytestr3, bytestr4, operation, operand1, operand2, bytetempstr, prefix1, prefix2: string;
+  numberLine, i, j, modd, reg, rm, byte2int, pos: integer;
   run: boolean;
   byteReg8: reg8T;
   byteReg16: reg16T;
+  byteSReg: sRegT;
 
 begin
   numberLine := 0;
@@ -304,90 +447,135 @@ begin
   operation := '';
   operand1 := '';
   operand2 := '';
+  prefix1 := '';
+  prefix2 := '';
   resstr := '';
   setlength(bytestr1, 2);
   setlength(bytestr2, 2);
   setlength(bytestr3, 2);
   setlength(bytestr4, 2);
-
   while (i <= length(str)) and (run) do
   begin
-    bytestr1[1] := str[i];
-    bytestr1[2] := str[i + 1];
-    i += 2;
+    numberLine := i div 2;
+    ReadByte(str, i, bytestr1);
     case bytestr1 of
 
-      'FE'..'FF': begin
-        bytestr2[1] := str[i];
-        bytestr2[2] := str[i + 1];
+      '06', '0E', '16', '1E': //PUSH
+      begin
+        operation := 'push';
+        byteSReg := sRegT(getReg(bytestr1));
+        operand1 := GetStrSReg(byteSReg);
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '07', '0F', '17', '1F': //POP
+      begin
+        operation := 'pop';
+        byteSReg := sRegT(getReg(bytestr1));
+        operand1 := GetStrSReg(byteSReg);
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+
+      'FE'..'FF': //DEC INC PUSH
+      begin
+        readbyte(str, i, bytestr2);
         reg := GetReg(bytestr2);
-        i += 2;
         case bytestr1 of
-          'FE': begin
+          'FE':
+          begin  //reg8 шыш рфЁхё 1 срщЄ
             case reg of
-              0: begin
+              0:
+              begin
                 operation := 'inc';
+                operand1 := GetROrMem8(str, bytestr2, i);
               end;
-              1: begin  //reg8 или адрес 1 байт
+              1:
+              begin
                 operation := 'dec';
-                byteReg8 := reg8T(getrm(bytestr2));
-                operand1 := GetStrReg8(byteReg8);
-                i += 2; // 1 байт
+                operand1 := GetROrMem8(str, bytestr2, i);
               end;
             end;
           end;
-          'FF': begin
+          'FF':
+          begin  //reg16 шыш рфЁхё 2 срщЄр
             case reg of
-              0: begin
+              0:
+              begin  // INC
                 operation := 'inc';
-              end;                     //                               1   2   3  4    5   6  7
-              1: begin  //reg16 или адрес 2 байта    reg16T = (AX = 0, CX, DX, BX, SP, BP, SI, DI);
-                operation := 'dec';
-                operand1 :=  GetModRM(bytestr2);
-                if (Contains('disp16', operand1)) then
-                begin
-                  bytestr3[1] := str[i];
-                  bytestr3[2] := str[i + 1];
-                  bytestr4[1] := str[i + 2];
-                  bytestr4[2] := str[i + 3];
-                  operand1 := 'word ptr [' + inttostr(hextodec(bytestr3+bytestr4)) + ']';
-                  i += 4; // байта
-                end
-                else if (Contains('disp8', operand1)) then
-                begin
-                  i += 2; // байта
-                end
-                else
-                begin
-
-                end;
-
+                operand1 := GetROrMem16(str, bytestr2, i);
               end;
-              6: begin
+              1:
+              begin  // DEC
+                operation := 'dec';
+                operand1 := GetROrMem16(str, bytestr2, i);
+              end;
+              6:
+              begin  // PUSH
                 operation := 'push';
+                operand1 := GetROrMem16(str, bytestr2, i);
               end;
             end;
           end;
         end;
-        resstr += DecToHex(numberLine, 4) + #9 + operation + ' ' + operand1 + ' ' + operand2 + #9 + bytestr1 + #10;
-        clearstr(operation, operand1, operand2);
-        numberLine += 2;
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
-      '48'..'4F': begin
+      '40'..'47': //INC
+      begin
+        operation := 'inc';
+        byteReg16 := reg16T(getRM(bytestr1));
+        operand1 := GetStrReg16(byteReg16);
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '48'..'4F': //DEC
+      begin
         operation := 'dec';
         byteReg16 := reg16T(getrm(bytestr1));
         operand1 := GetStrReg16(byteReg16);
-        resstr += DecToHex(numberLine, 4) + #9 + operation + ' ' + operand1 + ' ' + operand2 + #9 + bytestr1 + #10;
-        clearstr(operation, operand1, operand2);
-        numberLine += 1;
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-      else
+      '50'..'57': //PUSH
       begin
-        resstr += DecToHex(numberLine, 4) + #9 + operation + ' ' + operand1 + ' ' + operand2 + #9 + bytestr1 + #10;
-        numberLine += 1;
+        operation := 'push';
+        byteReg16 := reg16T(getRm(bytestr1));
+        operand1 := GetStrReg16(byteReg16);
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '58'..'5F': //POP
+      begin
+        operation := 'pop';
+        byteReg16 := reg16T(getRm(bytestr1));
+        operand1 := GetStrReg16(byteReg16);
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
 
+      '8F': //POP
+      begin
+        operation := 'pop';
+        readbyte(str, i, bytestr2);
+        operand1 := GetROrMem16(str, bytestr2, i);
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+
+      'F0': prefix1 := 'LOCK';
+      'F2': prefix1 := 'REPNZ';
+      'F3': prefix1 := 'REP';
+      '2E': prefix2 := 'CS';
+      '36': prefix2 := 'SS';
+      '3E': prefix2 := 'DS';
+      '26': prefix2 := 'ES';
+      else
+      begin
+        operation := 'db';
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
 
     end; // case
 
@@ -422,7 +610,10 @@ begin
   //resread := readfile(f);
   //resread := 'B800702EA300002EFF0E0000B802008ED8B409BA0000CD21B8004CCD210048656C6C6F2C20576F726C642124';
   //resread := 'B800702EA300002EFF0E0000FECCB802008ED8B409BA0200CD21B8004CCD210048656C6C6F2C20576F726C642124';
-  resread := 'B800702EA300002EFF0E0000FECCFF0DB802008ED8B409BA0400CD21B8004CCD210048656C6C6F2C20576F726C642124';
+  //resread := 'B800702EA300002EFF0E0102FECCFF0DB802008ED8B409BA0400CD21B8004CCD210048656C6C6F2C20576F726C642124';
+  //resread := 'FEC8FEC9FECAFECBFECCFECDFECEFECFFE0E1200FE0F';
+  //resread := 'FF4812FE0FFF4021FE07';
+  //resread := '8F4422';
   //hex := GetFormateLines(resread);
   assemblerCode := GetAssemblerCode(resread);
   //MemoByteCode.Text := hex;
