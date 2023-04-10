@@ -10,7 +10,7 @@ uses
 type
   reg8T = (AL = 0, CL, DL, BL, AH, CH, DH, BH);
   reg16T =(AX = 0, CX, DX, BX, SP, BP, SI, DI);
-  sRegT = (ES = 0, CS, SS, DS);
+  sRegT = (ES = 0, CS, SS, DS, FS, GS);
 
   { TForm1 }
 
@@ -28,7 +28,7 @@ type
   end;
 
 const
-  PATH = 'C:\Users\KISTO\Desktop\HELLO.EXE';
+  PATH = 'C:\Users\SASHA\Desktop\VBREAK.COM';
 
 var
   f: file;
@@ -63,8 +63,10 @@ begin
     decimal := decimal div 16;
   end;
   for i := 0 to bitDepth do
-    if length(resstr) = i then for j := i+1 to bitDepth do resstr := '0' + resstr;
-  DecToHex := resstr;
+    if length(resstr) = i then
+      for j := i+1 to bitDepth do
+        resstr := '0' + resstr;
+  DecToHex := copy(resstr, length(resstr)-bitDepth+1, bitDepth);
 end;
 
 function HexToDec(hex: string): integer;
@@ -136,6 +138,7 @@ var
   i: integer;
 
 begin
+  resstr := '';
   bytetempstr := '00000000';
   tempstr := DecToBin(HexToDec(str));
   for i := 1 to 8 - length(tempstr) do resstr += '0';
@@ -152,6 +155,7 @@ var
 
 begin
   bytetempstr := '00000000';
+  resstr := '';
   tempstr := DecToBin(HexToDec(str));
   for i := 1 to 8 - length(tempstr) do resstr += '0';
   resstr += tempstr;
@@ -167,6 +171,7 @@ var
   i: integer;
 
 begin
+  resstr := '';
   bytetempstr := '00000000';
   tempstr := DecToBin(HexToDec(str));
   for i := 1 to 8 - length(tempstr) do resstr += '0';
@@ -183,6 +188,7 @@ var
   i: integer;
 
 begin
+  resstr := '';
   bytetempstr := '00000000';
   tempstr := DecToBin(HexToDec(str));
   for i := 1 to 8 - length(tempstr) do resstr += '0';
@@ -192,15 +198,15 @@ begin
   bytetempstr[4] := '0';
   bytetempstr[5] := '0';
   i := BinToDec(bytetempstr);
-  case dectohex(i, 1) of
-    '0':  resstr := '[BX + SI]';
-    '1':  resstr := '[BX + DI]';
-    '2':  resstr := '[BP + SI]';
-    '3':  resstr := '[BP + DI]';
-    '4':  resstr := '[SI]';
-    '5':  resstr := '[DI]';
-    '6':  resstr := 'disp16';
-    '7':  resstr := '[BX]';
+  case dectohex(i, 2) of
+    '00':  resstr := '[BX + SI]';
+    '01':  resstr := '[BX + DI]';
+    '02':  resstr := '[BP + SI]';
+    '03':  resstr := '[BP + DI]';
+    '04':  resstr := '[SI]';
+    '05':  resstr := '[DI]';
+    '06':  resstr := 'disp16';
+    '07':  resstr := '[BX]';
     '40': resstr := '[BX + SI] + disp8';
     '41': resstr := '[BX + DI] + disp8';
     '42': resstr := '[BP + SI] + disp8';
@@ -227,6 +233,16 @@ begin
     //'C7': resstr := 'DI';
   end;
   GetModRM := resstr;
+end;
+
+function GetAdditionalCode(str: string): string;
+var
+  i: integer;
+begin
+  for i := 1 to length(str) do
+    if (str[i] = '0') then str[i] := '1'
+    else str[i] := '0';
+  GetAdditionalCode := dectobin(bintodec(str)+1);
 end;
 
 function GetStrReg8(e: reg8T): string;
@@ -264,6 +280,8 @@ begin
     CS: GetStrSReg := 'CS';
     SS: GetStrSReg := 'SS';
     DS: GetStrSReg := 'DS';
+    FS: GetStrSReg := 'FS';
+    GS: GetStrSReg := 'GS';
   end;
 end;
 
@@ -308,6 +326,8 @@ begin
 
   if (operand2 <> '') then
     temp := DecToHex(numberLine, 4) + #9 + prefix1 + ' ' + operation + #9 + operand1 + ', ' + operand2 + #10
+  else if (operation = 'db') then
+    temp := DecToHex(numberLine, 4) + #9 + prefix1 + ' ' + operation + #9 + operand1 + ' ' + operand2 + ' ; ' + chr(hextodec(bytestr1)) + #10
   else
     temp := DecToHex(numberLine, 4) + #9 + prefix1 + ' ' + operation + #9 + operand1 + ' ' + operand2 + #10;
   if (prefix2 <> '') then
@@ -423,20 +443,148 @@ end;
 
 function GetMemo8(str, bytestr: string; var i: integer): string;
 var
-  bytestr2: string;
+  bytestr3, bytestr4, operand, temp: string;
+  p, p2: integer;
+
 begin
-  readbyte(str, i, bytestr2);
-  GetMemo8 := 'byte ptr [0x'+bytestr2+bytestr+']';
+  operand := GetModRM(bytestr);
+  if (length(operand) = 8) then
+  begin
+    operand := '';
+  end
+  else
+  begin
+    if (Contains('disp16', operand, p) and ('disp16' <> operand)) then
+    begin
+      setlength(bytestr3, 2);
+      setlength(bytestr4, 2);
+      ReadByte(str, i, bytestr3);
+      ReadByte(str, i, bytestr4);
+      temp := bytestr4 + bytestr3;
+      if (temp >= '7F80') then
+      begin
+        temp := GetAdditionalCode(temp);
+        p2 := 0;
+        p2 := pos('+', operand, 8);
+        if (p2 = 0) then p2 := pos('+', operand);
+        operand[p2] := '-';
+      end;
+      operand := GetWordPtrDisp16Str(p, operand, temp, '');
+    end
+    else if (Contains('disp8', operand, p)) then
+    begin
+      setlength(bytestr3, 2);
+      bytestr4 := '';
+      ReadByte(str, i, bytestr3);
+      if (bytestr3 >= '80') then
+      begin
+        bytestr3 := GetAdditionalCode(bytestr3);
+        p2 := 0;
+        p2 := pos('+', operand, 8);
+        if (p2 = 0) then p2 := pos('+', operand);
+        operand[p2] := '-';
+      end;
+      operand := GetWordPtrDisp16Str(p, operand, bytestr3, bytestr4);
+    end
+    else if ('disp16' = operand) then
+    begin
+      setlength(bytestr3, 2);
+      setlength(bytestr4, 2);
+      ReadByte(str, i, bytestr3);
+      ReadByte(str, i, bytestr4);
+      operand := GetWordPtrDisp16Str(p, operand, bytestr3, bytestr4);
+    end
+    else
+    begin
+      operand := 'word ptr ' + operand;
+    end;
+  end;
+  GetMemo8 := operand;
 end;
 
 function GetMemo16(str, bytestr: string; var i: integer): string;
 var
+  bytestr3, bytestr4, operand, temp: string;
+  p, p2: integer;
+
+begin
+  operand := GetModRM(bytestr);
+  if (length(operand) = 8) then
+  begin
+    operand := '';
+  end
+  else
+  begin
+    if (Contains('disp16', operand, p) and ('disp16' <> operand)) then
+    begin
+      setlength(bytestr3, 2);
+      setlength(bytestr4, 2);
+      ReadByte(str, i, bytestr3);
+      ReadByte(str, i, bytestr4);
+      temp := bytestr4 + bytestr3;
+      if (temp >= '7F80') then
+      begin
+        temp := GetAdditionalCode(temp);
+        p2 := 0;
+        p2 := pos('+', operand, 8);
+        if (p2 = 0) then p2 := pos('+', operand);
+        operand[p2] := '-';
+      end;
+      operand := GetWordPtrDisp16Str(p, operand, temp, '');
+    end
+    else if (Contains('disp8', operand, p)) then
+    begin
+      setlength(bytestr3, 2);
+      bytestr4 := '';
+      ReadByte(str, i, bytestr3);
+      if (bytestr3 >= '80') then
+      begin
+        bytestr3 := GetAdditionalCode(bytestr3);
+        p2 := 0;
+        p2 := pos('+', operand, 8);
+        if (p2 = 0) then p2 := pos('+', operand);
+        operand[p2] := '-';
+      end;
+      operand := GetWordPtrDisp16Str(p, operand, bytestr3, bytestr4);
+    end
+    else if ('disp16' = operand) then
+    begin
+      setlength(bytestr3, 2);
+      setlength(bytestr4, 2);
+      ReadByte(str, i, bytestr3);
+      ReadByte(str, i, bytestr4);
+      operand := GetWordPtrDisp16Str(p, operand, bytestr3, bytestr4);
+    end
+    else
+    begin
+      operand := 'word ptr ' + operand;
+    end;
+  end;
+  GetMemo16 := operand;
+end;
+
+function GetFarAddres(str, bytestr: string; var i: integer): string;
+var
+  bytestr2, bytestr3, bytestr4: string;
+begin
+  readbyte(str, i, bytestr2);
+  readbyte(str, i, bytestr3);
+  readbyte(str, i, bytestr4);
+  GetFarAddres := '0x'+bytestr4+bytestr3+':'+'0x'+bytestr2+bytestr;
+end;
+
+function Get8BitRelative(str, bytestr: string; var i: integer): string;
+begin
+  Get8BitRelative := '0x'+dectohex(hextodec(bytestr)+i div 2, 2);
+end;
+
+function Get16BitRelative(str, bytestr: string; var i: integer): string;
+var
   bytestr2: string;
 begin
   readbyte(str, i, bytestr2);
-  GetMemo16 := 'word ptr [0x'+bytestr2+bytestr+']';
+  Get16BitRelative := '0x'+dectohex(hextodec(bytestr2+bytestr)+i div 2, 4);
 end;
-
 
 {$R *.lfm}
 
@@ -876,7 +1024,6 @@ begin
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
       '06', '0E', '16', '1E': //PUSH
       begin
         operation := 'push';
@@ -885,7 +1032,7 @@ begin
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-      '07', '17', '1F': //POP   0F(вроде есть, а вроде и нет)
+      '07', '17', '1F': //POP   0F not used
       begin
         operation := 'pop';
         byteSReg := sRegT(getReg(bytestr1));
@@ -893,14 +1040,109 @@ begin
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
-
-      '80', '81', '83': // ADD, OR, ADC, SBB, AND, SUB, XOR, CMP  r/m8/16, imm8/16
+      '27': //DAA
+      begin
+        operation := 'daa';
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '2F': //DAS
+      begin
+        operation := 'das';
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '37': //AAA
+      begin
+        operation := 'aaa';
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '3F': //AAS
+      begin
+        operation := 'aas';
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '70'..'7F': //JCC
+      begin
+        readbyte(str, i, bytestr2);
+        case bytestr1 of
+          '70': //JO
+          begin
+            operation := 'jo';
+          end;
+          '71': //JNO
+          begin
+            operation := 'jno';
+          end;
+          '72': //JB
+          begin
+            operation := 'jb';
+          end;
+          '73': //JNB
+          begin
+            operation := 'jnb';
+          end;
+          '74': //JE
+          begin
+            operation := 'je';
+          end;
+          '75': //JNE
+          begin
+            operation := 'jne';
+          end;
+          '76': //JBE
+          begin
+            operation := 'jbe';
+          end;
+          '77': //JNBE
+          begin
+            operation := 'jnbe';
+          end;
+          '78': //JS
+          begin
+            operation := 'js';
+          end;
+          '79': //JNS
+          begin
+            operation := 'jns';
+          end;
+          '7A': //JP
+          begin
+            operation := 'jp';
+          end;
+          '7B': //JNP
+          begin
+            operation := 'jnp';
+          end;
+          '7C': //JL
+          begin
+            operation := 'jl';
+          end;
+          '7D': //JNL
+          begin
+            operation := 'jnl';
+          end;
+          '7E': //JLE
+          begin
+            operation := 'jle';
+          end;
+          '7F': //JNLE
+          begin
+            operation := 'jnle';
+          end;
+        end;
+        operand1 := Get8BitRelative(str, bytestr2, i);
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '80'..'83': //ADD, OR, ADC, SBB, AND, SUB, XOR, CMP
       begin
         readbyte(str, i, bytestr2);
         reg := GetReg(bytestr2);
         case reg of
-          0:
+          0:  //ADD
           begin
             operation := 'add';
             case bytestr1 of
@@ -916,6 +1158,12 @@ begin
                 readbyte(str, i, bytestr2);
                 operand2 := GetImm16(str, bytestr2, i);
               end;
+              '82': //ADD r/m8, imm8
+              begin
+                operand1 := GetROrMem8(str, bytestr2, i);
+                readbyte(str, i, bytestr2);
+                operand2 := GetImm8(str, bytestr2, i);
+              end;
               '83': //ADD r/m16, imm8
               begin
                 operand1 := GetROrMem16(str, bytestr2, i);
@@ -924,7 +1172,7 @@ begin
               end;
             end;
           end;
-          1:
+          1:  //OR
           begin
             operation := 'or';
             case bytestr1 of
@@ -940,15 +1188,14 @@ begin
                 readbyte(str, i, bytestr2);
                 operand2 := GetImm16(str, bytestr2, i);
               end;
-              '83': //OR r/m16, imm8
+              '82', '83': //DB
               begin
-                operand1 := GetROrMem16(str, bytestr2, i);
-                readbyte(str, i, bytestr2);
-                operand2 := GetImm8(str, bytestr2, i);
+                operation := 'db';
+                operand1 := bytestr1;
               end;
             end;
           end;
-          2:
+          2:  //ADC
           begin
             operation := 'abc';
             case bytestr1 of
@@ -964,6 +1211,12 @@ begin
                 readbyte(str, i, bytestr2);
                 operand2 := GetImm16(str, bytestr2, i);
               end;
+              '82': //ADC r/m8, imm8
+              begin
+                operand1 := GetROrMem8(str, bytestr2, i);
+                readbyte(str, i, bytestr2);
+                operand2 := GetImm8(str, bytestr2, i);
+              end;
               '83': //ADC r/m16, imm8
               begin
                 operand1 := GetROrMem16(str, bytestr2, i);
@@ -972,7 +1225,7 @@ begin
               end;
             end;
           end;
-          3:
+          3:  //SBB
           begin
             operation := 'sbb';
             case bytestr1 of
@@ -988,6 +1241,12 @@ begin
                 readbyte(str, i, bytestr2);
                 operand2 := GetImm16(str, bytestr2, i);
               end;
+              '82': //SBB r/m8, imm8
+              begin
+                operand1 := GetROrMem8(str, bytestr2, i);
+                readbyte(str, i, bytestr2);
+                operand2 := GetImm8(str, bytestr2, i);
+              end;
               '83': //SBB r/m16, imm8
               begin
                 operand1 := GetROrMem16(str, bytestr2, i);
@@ -996,7 +1255,7 @@ begin
               end;
             end;
           end;
-          4:
+          4:  //AND
           begin
             operation := 'and';
             case bytestr1 of
@@ -1012,15 +1271,14 @@ begin
                 readbyte(str, i, bytestr2);
                 operand2 := GetImm16(str, bytestr2, i);
               end;
-              '83': //AND r/m16, imm8
+              '82', '83': //DB
               begin
-                operand1 := GetROrMem16(str, bytestr2, i);
-                readbyte(str, i, bytestr2);
-                operand2 := GetImm8(str, bytestr2, i);
+                operation := 'db';
+                operand1 := bytestr1;
               end;
             end;
           end;
-          5:
+          5:  //SUB
           begin
             operation := 'sub';
             case bytestr1 of
@@ -1036,6 +1294,12 @@ begin
                 readbyte(str, i, bytestr2);
                 operand2 := GetImm16(str, bytestr2, i);
               end;
+              '82': //SUB r/m8, imm8
+              begin
+                operand1 := GetROrMem8(str, bytestr2, i);
+                readbyte(str, i, bytestr2);
+                operand2 := GetImm8(str, bytestr2, i);
+              end;
               '83': //SUB r/m16, imm8
               begin
                 operand1 := GetROrMem16(str, bytestr2, i);
@@ -1044,7 +1308,7 @@ begin
               end;
             end;
           end;
-          6:
+          6:  //XOR
           begin
             operation := 'xor';
             case bytestr1 of
@@ -1060,15 +1324,14 @@ begin
                 readbyte(str, i, bytestr2);
                 operand2 := GetImm16(str, bytestr2, i);
               end;
-              '83': //XOR r/m16, imm8
+              '82', '83': //DB
               begin
-                operand1 := GetROrMem16(str, bytestr2, i);
-                readbyte(str, i, bytestr2);
-                operand2 := GetImm8(str, bytestr2, i);
+                operation := 'db';
+                operand1 := bytestr1;
               end;
             end;
           end;
-          7:
+          7:  //CMP
           begin
             operation := 'cmp';
             case bytestr1 of
@@ -1084,6 +1347,12 @@ begin
                 readbyte(str, i, bytestr2);
                 operand2 := GetImm16(str, bytestr2, i);
               end;
+              '82': //CMP r/m8, imm8
+              begin
+                operand1 := GetROrMem8(str, bytestr2, i);
+                readbyte(str, i, bytestr2);
+                operand2 := GetImm8(str, bytestr2, i);
+              end;
               '83': //CMP r/m16, imm8
               begin
                 operand1 := GetROrMem16(str, bytestr2, i);
@@ -1096,21 +1365,19 @@ begin
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
-      '88', '89': //MOV  r/m8/16, reg8/16
+      '84', '85': //TEST r/m8/r/m16, reg8/reg16
       begin
-        operation := 'mov';
+        operation := 'test';
+        readbyte(str, i, bytestr2);
         case bytestr1 of
-          '88':  //MOV  r/m8, reg8
+          '84': // TEST r/m8, reg8
           begin
-            readbyte(str, i, bytestr2);
             operand1 := GetROrMem8(str, bytestr2, i);
             byteReg8 := reg8T(getReg(bytestr2));
             operand2 := GetStrReg8(byteReg8);
           end;
-          '89':  //MOV  r/m16, reg16
+          '85': // TEST r/m16, reg16
           begin
-            readbyte(str, i, bytestr2);
             operand1 := GetROrMem16(str, bytestr2, i);
             byteReg16 := reg16T(getReg(bytestr2));
             operand2 := GetStrReg16(byteReg16);
@@ -1119,69 +1386,200 @@ begin
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
-      '8C', '8E': //MOV r/m16/sreg, sreg/r/m16
+      '86', '87': //XCHG reg8/reg16, r/m8/r/m16
       begin
-        operation := 'mov';
+        operation := 'xchg';
+        readbyte(str, i, bytestr2);
         case bytestr1 of
-          '8C':  //MOV r/m16, sreg
+          '86': // XCHG reg8, r/m8
           begin
-            readbyte(str, i, bytestr2);
-            operand1 := GetROrMem16(str, bytestr2, i);
-            byteSReg := sRegT(getReg(bytestr2));
-            operand2 := GetStrSReg(byteSReg);
+            byteReg8 := reg8T(getReg(bytestr2));
+            operand1 := GetStrReg8(byteReg8);
+            operand2 := GetROrMem8(str, bytestr2, i);
           end;
-          '8E':  //MOV sreg, r/m16
+          '87': // XCHG reg16, r/m16
           begin
-            readbyte(str, i, bytestr2);
-            byteSReg := sRegT(getReg(bytestr2));
-            operand1 := GetStrSReg(byteSReg);
+            byteReg16 := reg16T(getReg(bytestr2));
+            operand1 := GetStrReg16(byteReg16);
             operand2 := GetROrMem16(str, bytestr2, i);
           end;
         end;
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
-      '8F': //POP
-      begin
-        operation := 'pop';
-        readbyte(str, i, bytestr2);
-        operand1 := GetROrMem16(str, bytestr2, i);
-        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
-        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
-      end;
-
-      'A0'..'A3': //MOV
+      '88'..'8C': //MOV
       begin
         operation := 'mov';
         readbyte(str, i, bytestr2);
         case bytestr1 of
-          'A0':
+          '88':  //MOV  r/m8, reg8
+          begin
+            operand1 := GetROrMem8(str, bytestr2, i);
+            byteReg8 := reg8T(getReg(bytestr2));
+            operand2 := GetStrReg8(byteReg8);
+          end;
+          '89':  //MOV  r/m16, reg16
+          begin
+            operand1 := GetROrMem16(str, bytestr2, i);
+            byteReg16 := reg16T(getReg(bytestr2));
+            operand2 := GetStrReg16(byteReg16);
+          end;
+          '8A':  //MOV  reg8, r/m8
+          begin
+            byteReg8 := reg8T(getReg(bytestr2));
+            operand1 := GetStrReg8(byteReg8);
+            operand2 := GetROrMem8(str, bytestr2, i);
+          end;
+          '8B':  //MOV  reg16, r/m16
+          begin
+            byteReg16 := reg16T(getReg(bytestr2));
+            operand1 := GetStrReg16(byteReg16);
+            operand2 := GetROrMem16(str, bytestr2, i);
+          end;
+          '8C':  //MOV r/m16, sreg
+          begin
+            operand1 := GetROrMem16(str, bytestr2, i);
+            byteSReg := sRegT(getReg(bytestr2));
+            operand2 := GetStrSReg(byteSReg);
+          end;
+        end;
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '8D': //LEA
+      begin
+        operation := 'lea';
+        readbyte(str, i, bytestr2);
+        byteReg16 := reg16T(GetReg(bytestr2));
+        operand1 := GetStrReg16(byteReg16);
+        operand2 := GetROrMem16(str, bytestr2, i);
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '8E': //MOV sreg, r/m16
+      begin
+        operation := 'mov';
+        readbyte(str, i, bytestr2);
+        byteSReg := sRegT(getReg(bytestr2));
+        operand1 := GetStrSReg(byteSReg);
+        operand2 := GetROrMem16(str, bytestr2, i);
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '8F': //POP
+      begin
+        readbyte(str, i, bytestr2);
+        reg := GetReg(bytestr2);
+        case reg of
+          0: //POP
+          begin
+            operation := 'pop';
+            operand1 := GetROrMem16(str, bytestr2, i);
+          end;
+          else //DB
+          begin
+            operation := 'db';
+            operand1 := bytestr1;
+          end;
+        end;
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '90': //NOP
+      begin
+        operation := 'nop';
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '91'..'97': //XCHG
+      begin
+        operation := 'xchg';
+        operand1 := 'AX';
+        byteReg16 := reg16T(getRM(bytestr1));
+        operand2 := GetStrReg16(byteReg16);
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '98': //CBW
+      begin
+        operation := 'cbw';
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '99': //CWD
+      begin
+        operation := 'cwd';
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '9A': //CALL
+      begin
+        operation := 'call';
+        readbyte(str, i, bytestr2);
+        operand1 := GetFarAddres(str, bytestr2, i);
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '9B': //WAIT
+      begin
+        operation := 'wait';
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '9C': //PUSHF
+      begin
+        operation := 'pushf';
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '9D': //POPF
+      begin
+        operation := 'popf';
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '9E': //SAHF
+      begin
+        operation := 'sahf';
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      '9F': //LAHF
+      begin
+        operation := 'lahf';
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      'A0'..'A3': //MOV
+      begin
+        operation := 'mov';
+        readbyte(str, i, bytestr2);
+        readbyte(str, i, bytestr3);
+        case bytestr1 of
+          'A0': //MOV AL, MEMO8
           begin
             operand1 := 'AL';
-            operand2 := GetMemo8(str, bytestr2, i);
+            operand2 := GetBytePtrDisp8Str(pos, operand1, bytestr2, bytestr3);
           end;
-          'A1':
+          'A1': //MOV AX, MEMO16
           begin
             operand1 := 'AX';
-            operand2 := GetMemo16(str, bytestr2, i);
+            operand2 := GetWordPtrDisp16Str(pos, operand1, bytestr2, bytestr3);
           end;
-          'A2':
+          'A2': //MOV MEMO8, AL
           begin
-            operand1 := GetMemo8(str, bytestr2, i);
+            operand1 := GetBytePtrDisp8Str(pos, operand1, bytestr2, bytestr3);
             operand2 := 'AL';
           end;
-          'A3':
+          'A3': //MOV MEMO16, AX
           begin
-            operand1 := GetMemo16(str, bytestr2, i);
+            operand1 := GetWordPtrDisp16Str(pos, operand1, bytestr2, bytestr3);
             operand2 := 'AX';
           end;
         end;
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
       'A4': //MOVSB
       begin
         operation := 'movsb';
@@ -1190,7 +1588,6 @@ begin
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
       'A5': //MOVSW
       begin
         operation := 'movsw';
@@ -1199,7 +1596,6 @@ begin
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
       'A6': //CMPSB
       begin
         operation := 'cmpsb';
@@ -1208,17 +1604,90 @@ begin
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
-      'A7': //CMPW
+      'A7': //CMPSW
       begin
-        operation := 'cmpsb';
+        operation := 'cmpsw';
         operand1 := 'word ptr ds:[si]';
         operand2 := 'word ptr es:[di]';
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
-
+      'A8', 'A9': //TEST AL/AX, IMM8/IMM16
+      begin
+        operation := 'test';
+        readbyte(str, i, bytestr2);
+        case bytestr1 of
+          'A8': //TEST AL, IMM8
+          begin
+            operand1 := 'AL';
+            operand2 := GetImm8(str, bytestr2, i);
+          end;
+          'A9': //TEST AX, IMM16
+          begin
+            operand1 := 'AX';
+            operand2 := GetImm16(str, bytestr2, i);
+          end;
+        end;
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      'AA', 'AB': //STOSB, STOSW
+      begin
+        case bytestr1 of
+          'AA': //STOSB
+          begin
+            operation := 'stosb';
+            operand1 := 'byte ptr es:[di]';
+            operand2 := 'AL';
+          end;
+          'AB': //STOSW
+          begin
+            operation := 'stosw';
+            operand1 := 'word ptr es:[di]';
+            operand2 := 'AX';
+          end;
+        end;
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      'AC', 'AD': //LODSB, LODSW
+      begin
+        case bytestr1 of
+          'AC':  //LODSB AL = DS:[SI]
+          begin
+            operation := 'lodsb';
+            operand1 := 'AL';
+            operand2 := 'byte ptr [SI]';
+          end;
+          'AD':  //LODSW AX = DS:[SI]
+          begin
+            operation := 'lodsw';
+            operand1 := 'AX';
+            operand2 := 'word ptr [SI]';
+          end;
+        end;
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      'AE', 'AF': //SCASB, SCASW
+      begin
+        case bytestr1 of
+          'AE':  //SCASB
+          begin
+            operation := 'scasb';
+            operand1 := 'AL';
+            operand2 := 'byte ptr es:[di]';
+          end;
+          'AF':  //SCASW
+          begin
+            operation := 'scasw';
+            operand1 := 'AX';
+            operand2 := 'word ptr es:[di]';
+          end;
+        end;
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
       'B0'..'B7': //MOV  reg8, imm8
       begin
         operation := 'mov';
@@ -1239,53 +1708,93 @@ begin
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
-      //LDS reg16, mem32 $C4
-      //LES reg16, mem32 $C5
-
-
-      'C4', 'C5': //LDS, LES  reg16, mem32    fewqweffwqefeqwfeqwfqewfqewfqwef43cg2435g wergsergwerg245g45 gc5g45g
+      'C2', 'C3': //RET
+      begin
+        operation := 'ret';
+        case bytestr1 of
+          'C2': //RET IMM16
+          begin
+            readbyte(str, i, bytestr2);
+            operand1 := getimm16(str, bytestr2, i);
+          end;
+          'C3': //RET
+          begin
+          // Nothing :)
+        end;
+        end;
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      'C4', 'C5': //LDS, LES  reg16, mem16
       begin
         case bytestr1 of
-          'C4':  //LDS reg16, mem32
-          begin
-            operation := 'lds';
-          end;
-          'C5':  //LES reg16, mem32
+          'C4':  //LES reg16, mem16
           begin
             operation := 'les';
           end;
+          'C5':  //LDS reg16, mem16
+          begin
+            operation := 'lds';
+          end;
         end;
-        byteReg16 := reg16T(GetRM(bytestr1));
+        readbyte(str, i, bytestr1);
+        byteReg16 := reg16T(GetReg(bytestr1));
         operand1 := GetStrReg16(byteReg16);
-
+        operand2 := GetMemo16(str, bytestr1, i);
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
-
-
-
-
       'C6', 'C7': //MOV  r/m8/16, imm8/16
       begin
         operation := 'mov';
-        case bytestr1 of
-          'C6': //MOV  r/m8, imm8
+        readbyte(str, i, bytestr2);
+        reg := getReg(bytestr2);
+        case reg of
+          0:
           begin
-            operand1 := GetROrMem8(str, bytestr2, i);
-            readbyte(str, i, bytestr2);
-            operand2 := GetImm8(str, bytestr2, i);
+            case bytestr1 of
+              'C6': //MOV  r/m8, imm8
+              begin
+                operand1 := GetROrMem8(str, bytestr2, i);
+                readbyte(str, i, bytestr3);
+                operand2 := GetImm8(str, bytestr3, i);
+              end;
+              'C7': //MOV  r/m16, imm16
+              begin
+                operand1 := GetROrMem16(str, bytestr2, i);
+                readbyte(str, i, bytestr3);
+                operand2 := GetImm16(str, bytestr3, i);
+              end;
+            end;
+          end
+          else //DB
+          begin
+            operation := 'db';
+            operand1 := bytestr1;
           end;
-          'C7': //MOV  r/m16, imm16
+        end;
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2,
+          bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2,
+          bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      'CA', ' CB': //RET
+      begin
+        operation := 'ret';
+        case bytestr1 of
+          'CA': //RET IMM16
           begin
-            operand1 := GetROrMem16(str, bytestr2, i);
             readbyte(str, i, bytestr2);
-            operand2 := GetImm16(str, bytestr2, i);
+            operand1 := getimm16(str, bytestr2, i);
+          end;
+          'CB': //RET
+          begin
+            // Nothing :)
           end;
         end;
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
       'CC'..'CE': //INT INT3 INTO
       begin
         case bytestr1 of
@@ -1307,15 +1816,225 @@ begin
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
       'CF': //IRET
       begin
         operation := 'iret';
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
-      'E4', 'E5': //IN  AL/AX, addr8
+      'D0'..'D3': //ROL, ROR, RCL, RCR, SHL, SHR, SAR
+      begin
+        readbyte(str, i, bytestr2);
+        reg := getReg(bytestr2);
+        case bytestr1 of
+          'D0': // r/m8, 1
+          begin
+            operand1 := GetROrMem8(str, bytestr2, i);
+            operand2 := '1';
+            case reg of
+              0: //ROL
+              begin
+                operation := 'rol';
+              end;
+              1: //ROR
+              begin
+                operation := 'ror';
+              end;
+              2: //RCL
+              begin
+                operation := 'rcl';
+              end;
+              3: //RCR
+              begin
+                operation := 'rcr';
+              end;
+              4: //SHL
+              begin
+                operation := 'shl';
+              end;
+              5: //SHR
+              begin
+                operation := 'shr';
+              end;
+              6: //DB
+              begin
+                operation := 'db';
+                operand1 := bytestr1;
+              end;
+              7: //SAR
+              begin
+                operation := 'sar';
+              end;
+            end;
+          end;
+          'D1': // r/m16, 1
+          begin
+            operand1 := GetROrMem16(str, bytestr2, i);
+            operand2 := '1';
+            case reg of
+              0: //ROL
+              begin
+                operation := 'rol';
+              end;
+              1: //ROR
+              begin
+                operation := 'ror';
+              end;
+              2: //RCL
+              begin
+                operation := 'rcl';
+              end;
+              3: //RCR
+              begin
+                operation := 'rcr';
+              end;
+              4: //SHL
+              begin
+                operation := 'shl';
+              end;
+              5: //SHR
+              begin
+                operation := 'shr';
+              end;
+              6: //DB
+              begin
+                operation := 'db';
+                operand1 := bytestr1;
+              end;
+              7: //SAR
+              begin
+                operation := 'sar';
+              end;
+            end;
+          end;
+          'D2': // r/m8, cl
+          begin
+            operand1 := GetROrMem8(str, bytestr2, i);
+            operand2 := 'CL';
+            case reg of
+              0: //ROL
+              begin
+                operation := 'rol';
+              end;
+              1: //ROR
+              begin
+                operation := 'ror';
+              end;
+              2: //RCL
+              begin
+                operation := 'rcl';
+              end;
+              3: //RCR
+              begin
+                operation := 'rcr';
+              end;
+              4: //SHL
+              begin
+                operation := 'shl';
+              end;
+              5: //SHR
+              begin
+                operation := 'shr';
+              end;
+              6: //DB
+              begin
+                operation := 'db';
+                operand1 := bytestr1;
+              end;
+              7: //SAR
+              begin
+                operation := 'sar';
+              end;
+            end;
+          end;
+          'D3': // r/m16, cl
+          begin
+            operand1 := GetROrMem16(str, bytestr2, i);
+            operand2 := 'CL';
+            case reg of
+              0: //ROL
+              begin
+                operation := 'rol';
+              end;
+              1: //ROR
+              begin
+                operation := 'ror';
+              end;
+              2: //RCL
+              begin
+                operation := 'rcl';
+              end;
+              3: //RCR
+              begin
+                operation := 'rcr';
+              end;
+              4: //SHL
+              begin
+                operation := 'shl';
+              end;
+              5: //SHR
+              begin
+                operation := 'shr';
+              end;
+              6: //DB
+              begin
+                operation := 'db';
+                operand1 := bytestr1;
+              end;
+              7: //SAR
+              begin
+                operation := 'sar';
+              end;
+            end;
+          end;
+        end;
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      'D4': //AMM
+      begin
+        operation := 'aam';
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      'D5': //AAD
+      begin
+        operation := 'add';
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      'D7': //XLAT
+      begin
+        operation := 'xlatb';
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      'E0'..'E3': //LOOPNE, LOOPE, LOOP, JCXZ 8-bit relative
+      begin
+        readbyte(str, i, bytestr2);
+        operand1 := Get8BitRelative(str, bytestr2, i);
+        case bytestr1 of
+          'E0': //LOOPNE 8-bit relative
+          begin
+            operation := 'loopne';
+          end;
+          'E1': //LOOPE 8-bit relative
+          begin
+            operation := 'loope';
+          end;
+          'E2': //LOOP 8-bit relative
+          begin
+            operation := 'loop';
+          end;
+          'E3': //JCXZ 8-bit relative
+          begin
+            operation := 'jcxz';
+          end;
+        end;
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      'E4', 'E5': //IN  AL/AX, imm8
       begin
         operation := 'in';
         case bytestr1 of
@@ -1335,16 +2054,55 @@ begin
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
-
-      //LODSB AL = DS:[SI] $AC
-      //LODSW AX = DS:[SI] $AD
-      //LOOP 8-bit relative $E2
-
-
-
-
-
+      'E6', 'E7': //OUT imm8, AL/AX
+      begin
+        operation := 'out';
+        case bytestr1 of
+          'E6':  //OUT AL, addr8
+          begin
+            readbyte(str, i, bytestr2);
+            operand1 := getimm8(str, bytestr2, i);
+            operand2 := 'AL';
+          end;
+          'E7':  //OUT AX, addr8
+          begin
+            readbyte(str, i, bytestr2);
+            operand1 := getimm8(str, bytestr2, i);
+            operand2 := 'AX';
+          end;
+        end;
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      'E8': //CALL
+      begin
+        operation := 'call';
+        readbyte(str, i, bytestr2);
+        operand1 := Get16BitRelative(str, bytestr2, i);
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      'E9'..'EB': //JMP
+      begin
+        operation := 'jmp';
+        readbyte(str, i, bytestr2);
+        case bytestr1 of
+          'E9': //JMP NEAR-LABEL
+          begin
+            operand1 := Get16BitRelative(str, bytestr2, i);
+          end;
+          'EA': //JMP FAR-LABEL
+          begin
+            operand1 := GetFarAddres(str, bytestr2, i);
+          end;
+          'EB': //JMP SHORT-LABEL
+          begin
+            operand1 := Get8BitRelative(str, bytestr2, i);
+          end;
+        end;
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
       'EC', 'ED': //IN  AL/AX, port[DX]
       begin
         operation := 'in';
@@ -1363,23 +2121,56 @@ begin
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
-
+      'EE', 'EF': //OUT  AL/AX, port[DX]
+      begin
+        operation := 'out';
+        case bytestr1 of
+          'EE': //OUT  AL, port[DX]
+          begin
+            operand1 := 'DX';
+            operand2 := 'AL';
+          end;
+          'EF': //OUT  AX, port[DX]
+          begin
+            operand1 := 'DX';
+            operand2 := 'AX';
+          end;
+        end;
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
       'F4': //HLT
       begin
         operation := 'hlt';
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
-      'F6', 'F7': //NOT, NEG, MUL, IMUL, DIV, IDIV
+      'F5': //CMC
+      begin
+        operation := 'cmc';
+        resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
+        clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
+      end;
+      'F6', 'F7': //TEST, NOT, NEG, MUL, IMUL, DIV, IDIV
       begin
         readbyte(str, i, bytestr2);
         reg := GetReg(bytestr2);
         case bytestr1 of
-          'F6': //NOT, NEG, MUL, IMUL, DIV, IDIV
+          'F6': //TEST, NOT, NEG, MUL, IMUL, DIV, IDIV
           begin
             case reg of
+              0: //TEST
+              begin
+                operation := 'test';
+                operand1 := GetROrMem8(str, bytestr2, i);
+                readbyte(str, i, bytestr3);
+                operand2 := GetImm8(str, bytestr3, i);
+              end;
+              1: //DB
+              begin
+                operation := 'db';
+                operand1 := bytestr1;
+              end;
               2: //NOT
               begin
                 operation := 'not';
@@ -1412,9 +2203,21 @@ begin
               end;
             end;
           end;
-          'F7': //NOT, NEG, MUL, IMUL, DIV, IDIV
+          'F7': //TEST, NOT, NEG, MUL, IMUL, DIV, IDIV
           begin
             case reg of
+              0: //TEST
+              begin
+                operation := 'test';
+                operand1 := GetROrMem16(str, bytestr2, i);
+                readbyte(str, i, bytestr3);
+                operand2 := GetImm16(str, bytestr3, i);
+              end;
+              1: //DB
+              begin
+                operation := 'db';
+                operand1 := bytestr1;
+              end;
               2: //NOT
               begin
                 operation := 'not';
@@ -1451,53 +2254,104 @@ begin
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
-      'FC': //CLD
+      'F8'..'FD': //CLC, STC, CLI, STI, CLD, STD
       begin
-        operation := 'cld';
+        case bytestr1 of
+          'F8': //CLC
+          begin
+            operation := 'clc';
+          end;
+          'F9': //STC
+          begin
+            operation := 'stc';
+          end;
+          'FA': //CLI
+          begin
+            operation := 'cli';
+          end;
+          'FB': //STI
+          begin
+            operation := 'sti';
+          end;
+          'FC': //CLD
+          begin
+            operation := 'cld';
+          end;
+          'FD': //STD
+          begin
+            operation := 'std';
+          end;
+        end;
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
-
-
-      'FE'..'FF': //DEC INC PUSH
+      'FE'..'FF': //INC, DEC, CALL, JMP, PUSH
       begin
         readbyte(str, i, bytestr2);
         reg := GetReg(bytestr2);
         case bytestr1 of
-          'FE':
-          begin  //reg8 или адрес 1 байт
+          'FE': //INC, DEC
+          begin
             case reg of
-              0:
+              0: //INC
               begin
                 operation := 'inc';
                 operand1 := GetROrMem8(str, bytestr2, i);
               end;
-              1:
+              1: //DEC
               begin
                 operation := 'dec';
                 operand1 := GetROrMem8(str, bytestr2, i);
+              end;
+              else //DB
+              begin
+                operation := 'db';
+                operand1 := bytestr1;
               end;
             end;
           end;
-          'FF':
-          begin  //reg16 или адрес 2 байта
+          'FF': //INC, DEC, CALL, JMP, PUSH
+          begin
             case reg of
-              0:
-              begin  // INC
+              0: //INC mem16
+              begin
                 operation := 'inc';
-                operand1 := GetROrMem16(str, bytestr2, i);
+                operand1 := GetMemo16(str, bytestr2, i);
               end;
-              1:
-              begin  // DEC
+              1: //DEC mem16
+              begin
                 operation := 'dec';
+                operand1 := GetMemo16(str, bytestr2, i);
+              end;
+              2: //CALL r/m16
+              begin
+                operation := 'call';
                 operand1 := GetROrMem16(str, bytestr2, i);
               end;
-              6:
-              begin  // PUSH
+              3: //CALL mem16
+              begin
+                operation := 'call';
+                operand1 := GetMemo16(str, bytestr2, i);
+              end;
+              4: //JMP r/m16
+              begin
+                operation := 'jmp';
+                operand1 := GetROrMem16(str, bytestr2, i);
+              end;
+              5: //JMP mem16
+              begin
+                operation := 'jmp';
+                operand1 := GetMemo16(str, bytestr2, i);
+              end;
+              6: //PUSH mem16
+              begin
                 operation := 'push';
-                operand1 := GetROrMem16(str, bytestr2, i);
+                operand1 := GetMemo16(str, bytestr2, i);
+              end;
+              7: //DB
+              begin
+                operation := 'db';
+                operand1 := bytestr1;
               end;
             end;
           end;
@@ -1505,20 +2359,13 @@ begin
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
-
-
-
       'F0': prefix1 := 'LOCK';
       'F2': prefix1 := 'REPNZ';
       'F3': prefix1 := 'REP';
+      '26': prefix2 := 'ES';
       '2E': prefix2 := 'CS';
       '36': prefix2 := 'SS';
       '3E': prefix2 := 'DS';
-      '26': prefix2 := 'ES';
-      '64': prefix2 := 'FS';
-      '65': prefix2 := 'GS';
-
       else // DB
       begin
         operation := 'db';
@@ -1526,11 +2373,7 @@ begin
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
         clearstr(operation, operand1, operand2, bytestr1, bytestr2, bytestr3, bytestr4, prefix1, prefix2);
       end;
-
-
     end; // case
-
-
   end;   // while
   GetAssemblerCode := resstr;
 end;
@@ -1558,18 +2401,13 @@ var
 
 begin
   assignfile(f, PATH);
-  //resread := readfile(f);
-  //resread := 'B800702EA300002EFF0E0000B802008ED8B409BA0000CD21B8004CCD210048656C6C6F2C20576F726C642124';
-  //resread := 'B800702EA300002EFF0E0000FECCB802008ED8B409BA0200CD21B8004CCD210048656C6C6F2C20576F726C642124';
+  resread := readfile(f);
   //resread := 'B800702EA300002EFF0E0102FECCFF0DB802008ED8B409BA0400CD21B8004CCD210048656C6C6F2C20576F726C642124';
-  //resread := 'FEC8FEC9FECAFECBFECCFECDFECEFECFFE0E1200FE0F';
-  //resread := 'FF4812FE0FFF4021FE07';
-  //resread := '8F4422';
-  resread := 'E460E500ECEDCF';
-  //hex := GetFormateLines(resread);
+
+  hex := GetFormateLines(resread);
   assemblerCode := GetAssemblerCode(resread);
-  //MemoByteCode.Text := hex;
-  MemoByteCode.Text := resread;
+  MemoByteCode.Text := hex;
+  //MemoByteCode.Text := resread;
   MemoAssembler.Text := assemblerCode;
 end;
 
