@@ -9,4 +9,4 @@
 
 Ссылка на EXE и COM файлы для теста: https://disk.yandex.ru/d/HZZJm0RyJP9T6A
 
-Ссылка на сайт с играми под DOS: https://www.old-games.ru/catalog
+Ссылка на сайт с играми под DOS: https://www.old-games.ru/catalog/
