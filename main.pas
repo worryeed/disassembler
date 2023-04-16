@@ -2522,6 +2522,7 @@ var
   errorstr: string;
 
 begin
+  SaveDialog.FileName := Copy(ExtractFileName(OpenDialog.FileName), 1, length(ExtractFileName(OpenDialog.FileName))-4);
   if (SaveDialog.Execute) then
   begin
     assignfile(f, SaveDialog.FileName);

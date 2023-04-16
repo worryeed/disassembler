@@ -49,16 +49,19 @@ object MainForm: TMainForm
       Caption = 'Файл'
       object MenuItemTakeFile: TMenuItem
         Caption = 'Выбрать файл'
+        ShortCut = 16463
         OnClick = MenuItemTakeFileClick
       end
       object MenuItemSaveFile: TMenuItem
         Caption = 'Сохранить файл'
         Enabled = False
+        ShortCut = 16467
         OnClick = MenuItemSaveFileClick
       end
       object MenuItemCloseFile: TMenuItem
         Caption = 'Закрыть файл'
         Enabled = False
+        ShortCut = 16451
         OnClick = MenuItemCloseFileClick
       end
       object Separator: TMenuItem
