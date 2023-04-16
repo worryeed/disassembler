@@ -1,40 +1,94 @@
-object Form1: TForm1
-  Left = 448
-  Height = 718
-  Top = 116
-  Width = 1115
-  HorzScrollBar.Page = 1032
-  VertScrollBar.Page = 634
-  AutoScroll = True
-  Caption = 'Form1'
-  ClientHeight = 718
-  ClientWidth = 1115
+object MainForm: TMainForm
+  Left = 652
+  Height = 629
+  Top = 288
+  Width = 904
+  BorderIcons = [biSystemMenu, biMinimize]
+  BorderStyle = bsSingle
+  Caption = 'DISASSEMBLER I8086'
+  ClientHeight = 609
+  ClientWidth = 904
+  Menu = MainMenu
   OnCreate = FormCreate
   LCLVersion = '2.2.4.0'
   object MemoByteCode: TMemo
-    Left = 40
-    Height = 607
-    Top = 24
-    Width = 456
+    Left = 0
+    Height = 609
+    Top = 0
+    Width = 448
+    Font.Height = -12
     Lines.Strings = (
       'memobytecode'
     )
+    ParentFont = False
     ReadOnly = True
-    ScrollBars = ssAutoVertical
+    ScrollBars = ssAutoBoth
     TabOrder = 0
     TabStop = False
+    WordWrap = False
   end
   object MemoAssembler: TMemo
-    Left = 576
-    Height = 610
-    Top = 24
-    Width = 456
+    Left = 456
+    Height = 609
+    Top = 0
+    Width = 448
+    Font.Height = -12
     Lines.Strings = (
       'MemoAssembler'
     )
+    ParentFont = False
     ReadOnly = True
-    ScrollBars = ssAutoVertical
+    ScrollBars = ssAutoBoth
     TabOrder = 1
     TabStop = False
+    WordWrap = False
+  end
+  object MainMenu: TMainMenu
+    Left = 352
+    object MenuItemFile: TMenuItem
+      Caption = 'Файл'
+      object MenuItemTakeFile: TMenuItem
+        Caption = 'Выбрать файл'
+        OnClick = MenuItemTakeFileClick
+      end
+      object MenuItemSaveFile: TMenuItem
+        Caption = 'Сохранить файл'
+        Enabled = False
+        OnClick = MenuItemSaveFileClick
+      end
+      object MenuItemCloseFile: TMenuItem
+        Caption = 'Закрыть файл'
+        Enabled = False
+        OnClick = MenuItemCloseFileClick
+      end
+      object Separator: TMenuItem
+        Caption = '-'
+      end
+      object MenuItemExit: TMenuItem
+        Caption = 'Выход'
+        OnClick = MenuItemExitClick
+      end
+    end
+    object MenuItemView: TMenuItem
+      Caption = 'Вид'
+      object MenuItemZoomIn: TMenuItem
+        Caption = 'Увеличить масштаб'
+        ShortCut = 16571
+        OnClick = MenuItemZoomInClick
+      end
+      object MenuItemZoomOut: TMenuItem
+        Caption = 'Уменьшить маcштаб'
+        ShortCut = 16573
+        OnClick = MenuItemZoomOutClick
+      end
+    end
+  end
+  object OpenDialog: TOpenDialog
+    Filter = '*.exe|*.exe|*.com|*.com'
+    Left = 272
+  end
+  object SaveDialog: TSaveDialog
+    Filter = '*.txt|*.txt'
+    Left = 192
   end
 end

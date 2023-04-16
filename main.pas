@@ -5,20 +5,40 @@ unit main;
 interface
 
 uses
-  Classes, SysUtils, Forms, Controls, Graphics, Dialogs, StdCtrls, ExtCtrls, Math, TypInfo;
+  Classes, SysUtils, Forms, Controls, Graphics, Dialogs, StdCtrls, ExtCtrls,
+  Menus, Math, LCLType;
 
 type
   reg8T = (AL = 0, CL, DL, BL, AH, CH, DH, BH);
   reg16T =(AX = 0, CX, DX, BX, SP, BP, SI, DI);
   sRegT = (ES = 0, CS, SS, DS, FS, GS);
 
-  { TForm1 }
+  { TMainForm }
 
-  TForm1 = class(TForm)
+  TMainForm = class(TForm)
+    MainMenu: TMainMenu;
     MemoAssembler: TMemo;
     MemoByteCode: TMemo;
+    MenuItemSaveFile: TMenuItem;
+    MenuItemCloseFile: TMenuItem;
+    MenuItemExit: TMenuItem;
+    MenuItemFile: TMenuItem;
+    MenuItemTakeFile: TMenuItem;
+    MenuItemView: TMenuItem;
+    MenuItemZoomIn: TMenuItem;
+    MenuItemZoomOut: TMenuItem;
+    OpenDialog: TOpenDialog;
+    SaveDialog: TSaveDialog;
+    Separator: TMenuItem;
     procedure FormCreate(Sender: TObject);
-    function ReadFile(var f: file): string;
+    procedure MenuItemCloseFileClick(Sender: TObject);
+    procedure MenuItemExitClick(Sender: TObject);
+    procedure MenuItemSaveFileClick(Sender: TObject);
+    procedure MenuItemTakeFileClick(Sender: TObject);
+    procedure MenuItemZoomInClick(Sender: TObject);
+    procedure MenuItemZoomOutClick(Sender: TObject);
+    function TryReadFile(var f: file; var resstr, errorstr: string): boolean;
+    function TrySaveFile(var f: file; str: string; var errorstr: string): boolean;
     function GetFormateLines(str: string): string;
     function GetAssemblerCode(str: string): string;
   private
@@ -27,12 +47,9 @@ type
 
   end;
 
-const
-  PATH = 'C:\Users\SASHA\Desktop\VBREAK.COM';
-
 var
   f: file;
-  Form1: TForm1;
+  MainForm: TMainForm;
 
 implementation
 
@@ -575,7 +592,7 @@ end;
 
 function Get8BitRelative(str, bytestr: string; var i: integer): string;
 begin
-  Get8BitRelative := '0x'+dectohex(hextodec(bytestr)+i div 2, 2);
+  Get8BitRelative := '0x'+dectohex(hextodec('FF'+bytestr)+i div 2, 4);
 end;
 
 function Get16BitRelative(str, bytestr: string; var i: integer): string;
@@ -588,9 +605,9 @@ end;
 
 {$R *.lfm}
 
-{ TForm1 }
+{ TMainForm }
 
-function TForm1.GetFormateLines(str: string): string;
+function TMainForm.GetFormateLines(str: string): string;
 
 var
   resstr: string;
@@ -615,7 +632,7 @@ begin
   GetFormateLines := resstr;
 end;
 
-function TForm1.GetAssemblerCode(str: string): string;
+function TMainForm.GetAssemblerCode(str: string): string;
 var
   resstr, bytestr1, bytestr2, bytestr3, bytestr4, operation, operand1, operand2, bytetempstr, prefix1, prefix2: string;
   numberLine, i, j, modd, reg, rm, byte2int, pos: integer;
@@ -627,7 +644,6 @@ var
 begin
   numberLine := 0;
   i := 1;
-  run := true;
   operation := '';
   operand1 := '';
   operand2 := '';
@@ -638,7 +654,7 @@ begin
   setlength(bytestr2, 2);
   setlength(bytestr3, 2);
   setlength(bytestr4, 2);
-  while (i <= length(str)) and (run) do
+  while (i <= length(str)) do
   begin
     numberLine := i div 2;
     ReadByte(str, i, bytestr1);
@@ -1192,6 +1208,7 @@ begin
               begin
                 operation := 'db';
                 operand1 := bytestr1;
+                i -=2;
               end;
             end;
           end;
@@ -1275,6 +1292,7 @@ begin
               begin
                 operation := 'db';
                 operand1 := bytestr1;
+                i -=2;
               end;
             end;
           end;
@@ -1328,6 +1346,7 @@ begin
               begin
                 operation := 'db';
                 operand1 := bytestr1;
+                i -=2;
               end;
             end;
           end;
@@ -1480,6 +1499,7 @@ begin
           begin
             operation := 'db';
             operand1 := bytestr1;
+            i -=2;
           end;
         end;
         resstr += GetOutputStr(numberLine, operation, operand1, operand2, bytestr1, prefix1, prefix2);
@@ -1771,6 +1791,7 @@ begin
           begin
             operation := 'db';
             operand1 := bytestr1;
+            i -=2;
           end;
         end;
         resstr += GetOutputStr(numberLine, operation, operand1, operand2,
@@ -1860,6 +1881,7 @@ begin
               begin
                 operation := 'db';
                 operand1 := bytestr1;
+                i -=2;
               end;
               7: //SAR
               begin
@@ -1900,6 +1922,7 @@ begin
               begin
                 operation := 'db';
                 operand1 := bytestr1;
+                i -=2;
               end;
               7: //SAR
               begin
@@ -1940,6 +1963,7 @@ begin
               begin
                 operation := 'db';
                 operand1 := bytestr1;
+                i -=2;
               end;
               7: //SAR
               begin
@@ -1980,6 +2004,7 @@ begin
               begin
                 operation := 'db';
                 operand1 := bytestr1;
+                i -=2;
               end;
               7: //SAR
               begin
@@ -2170,6 +2195,7 @@ begin
               begin
                 operation := 'db';
                 operand1 := bytestr1;
+                i -=2;
               end;
               2: //NOT
               begin
@@ -2217,6 +2243,7 @@ begin
               begin
                 operation := 'db';
                 operand1 := bytestr1;
+                i -=2;
               end;
               2: //NOT
               begin
@@ -2307,6 +2334,7 @@ begin
               begin
                 operation := 'db';
                 operand1 := bytestr1;
+                i -=2;
               end;
             end;
           end;
@@ -2352,6 +2380,7 @@ begin
               begin
                 operation := 'db';
                 operand1 := bytestr1;
+                i -= 2;
               end;
             end;
           end;
@@ -2378,37 +2407,177 @@ begin
   GetAssemblerCode := resstr;
 end;
 
-function TForm1.ReadFile(var f: file): string;
+function TMainForm.TryReadFile(var f: file; var resstr, errorstr: string): boolean;
 var
   str: string;
   b: byte;
+  run: boolean;
 
 begin
+  run := true;
   str := '';
+  {$I-}
   reset(f, 1);
-  while (not eof(f)) do
+  {$I+}
+  if (ioresult <> 0) then
   begin
-    blockread(f, b, sizeof(b));
-    str += DecToHex(b, 2);
+    errorstr := 'Ошибка открытия файла №' + IntToStr(ioresult);
+    run := False;
+  end
+  else
+  begin
+    while ((run) and (not EOF(f))) do
+    begin
+      {$I-}
+      blockread(f, b, sizeof(b));
+      {$I+}
+      if (ioresult <> 0) then
+      begin
+        errorstr := 'Ошибка чтения файла №' + IntToStr(ioresult);
+        run := False;
+      end
+      else
+        str += DecToHex(b, 2);
+    end;
+    {$I-}
+    closefile(f);
+    {$I+}
+    if (ioresult <> 0) then
+    begin
+      errorstr := 'Ошибка закрытия файла №' + IntToStr(ioresult);
+      run := False;
+    end;
   end;
-  closefile(f);
-  ReadFile := str;
+  resstr := str;
+  TryReadFile := run;
 end;
 
-procedure TForm1.FormCreate(Sender: TObject);
+function TMainForm.TrySaveFile(var f: file; str: string; var errorstr: string): boolean;
 var
-  resread, hex, assemblerCode: string;
+  ch: char;
+  run: boolean;
+  i: integer;
 
 begin
-  assignfile(f, PATH);
-  resread := readfile(f);
-  //resread := 'B800702EA300002EFF0E0102FECCFF0DB802008ED8B409BA0400CD21B8004CCD210048656C6C6F2C20576F726C642124';
+  i := 1;
+  run := true;
+  {$I-}
+  rewrite(f, 1);
+  {$I+}
+  if (ioresult <> 0) then
+  begin
+    errorstr := 'Ошибка открытия файла №' + IntToStr(ioresult);
+    run := False;
+  end
+  else
+  begin
+    while ((run) and (i <= length(str))) do
+    begin
+      ch := str[i];
+      {$I-}
+      blockwrite(f, ch, sizeof(ch));
+      {$I+}
+      i += 1;
+      if (ioresult <> 0) then
+      begin
+        errorstr := 'Ошибка записи в файл №' + IntToStr(ioresult);
+        run := False;
+      end;
+    end;
+    {$I-}
+    closefile(f);
+    {$I+}
+    if (ioresult <> 0) then
+    begin
+      errorstr := 'Ошибка закрытия файла №' + IntToStr(ioresult);
+      run := False;
+    end;
+  end;
+  TrySaveFile := run;
+end;
 
-  hex := GetFormateLines(resread);
-  assemblerCode := GetAssemblerCode(resread);
-  MemoByteCode.Text := hex;
-  //MemoByteCode.Text := resread;
-  MemoAssembler.Text := assemblerCode;
+procedure TMainForm.FormCreate(Sender: TObject);
+begin
+  MemoByteCode.Text := '';
+  MemoAssembler.Text := '';
+end;
+
+procedure TMainForm.MenuItemCloseFileClick(Sender: TObject);
+begin
+  MemoByteCode.Text := '';
+  MemoAssembler.Text := '';
+  MemoByteCode.Font.Size := 9;
+  MemoAssembler.Font.Size := 9;
+  MenuItemSaveFile.Enabled := False;
+  MenuItemCloseFile.Enabled := False;
+end;
+
+procedure TMainForm.MenuItemExitClick(Sender: TObject);
+begin
+  MainForm.Close;
+end;
+
+procedure TMainForm.MenuItemSaveFileClick(Sender: TObject);
+var
+  errorstr: string;
+
+begin
+  if (SaveDialog.Execute) then
+  begin
+    assignfile(f, SaveDialog.FileName);
+    if (not TrySaveFile(f, MemoAssembler.Text, errorstr)) then
+    begin
+       Application.MessageBox(PChar(errorstr), 'Ошибка', MB_ICONERROR);
+    end;
+  end;
+end;
+
+procedure TMainForm.MenuItemTakeFileClick(Sender: TObject);
+var
+  resread, hex, assemblerCode, errorstr: string;
+
+begin
+  if (OpenDialog.Execute) then
+  begin
+    assignfile(f, OpenDialog.FileName);
+    if (TryReadFile(f, resread, errorstr)) then
+    begin
+      hex := GetFormateLines(resread);
+      assemblerCode := GetAssemblerCode(resread);
+      MemoByteCode.Text := hex;
+      MemoAssembler.Text := assemblerCode;
+      MenuItemSaveFile.Enabled := True;
+      MenuItemCloseFile.Enabled := True;
+    end
+    else
+    begin
+       Application.MessageBox(PChar(errorstr), 'Ошибка', MB_ICONERROR);
+    end;
+  end;
+end;
+
+procedure TMainForm.MenuItemZoomInClick(Sender: TObject);
+var
+  size: integer;
+begin
+  if (MemoByteCode.Font.Size < 20) then
+  begin
+      size := MemoByteCode.Font.Size + 1;
+      MemoByteCode.Font.Size := size;
+      MemoAssembler.Font.Size := size;
+  end;
+end;
+
+procedure TMainForm.MenuItemZoomOutClick(Sender: TObject);
+var
+  size: integer;
+begin
+  if (MemoByteCode.Font.Size > 5) then
+  begin
+      size := MemoByteCode.Font.Size - 1;
+      MemoByteCode.Font.Size := size;
+      MemoAssembler.Font.Size := size;
+  end;
 end;
 
 end.
