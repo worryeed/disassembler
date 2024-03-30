@@ -1,4 +1,3 @@
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
 # Disassembler I8086
 Это дизассемблер с графическим интерфейсом, поддерживающий все инструкции Intel 8086. 
 
