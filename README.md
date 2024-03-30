@@ -10,3 +10,15 @@
 Ссылка на EXE и COM файлы для теста: https://disk.yandex.ru/d/HZZJm0RyJP9T6A
 
 Ссылка на сайт с играми под DOS: https://www.old-games.ru/catalog/
+
+gitGraph
+    commit
+    commit
+    branch develop
+    checkout develop
+    commit
+    commit
+    checkout main
+    merge develop
+    commit
+    commit
